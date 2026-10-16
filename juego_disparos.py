@@ -17,15 +17,16 @@ ALTO = 600
 FPS = 60
 
 # Colores (RGB)
-NEGRO   = (0, 0, 0)
-BLANCO  = (255, 255, 255)
-ROJO    = (255, 0, 0)
-VERDE   = (0, 255, 0)
-AZUL    = (0, 0, 255)
-AMARILLO= (255, 255, 0)
+NEGRO    = (0, 0, 0)
+BLANCO   = (255, 255, 255)
+ROJO     = (255, 0, 0)
+VERDE    = (0, 255, 0)
+AZUL     = (0, 0, 255)
+AMARILLO = (255, 255, 0)
+CIAN     = (0, 255, 255)
 
 pantalla = pygame.display.set_mode((ANCHO, ALTO))
-pygame.display.set_caption("Juego de Disparos 2D - Pygame")
+pygame.display.set_caption("Juego de Disparos 2D - 2 Jugadores (Pygame)")
 reloj = pygame.time.Clock()
 fuente = pygame.font.SysFont("arial", 28)
 fuente_grande = pygame.font.SysFont("arial", 48)
@@ -66,16 +67,24 @@ try:
     sonido_explosion = pygame.mixer.Sound(buffer=generar_ruido(0.25, 0.5))
     sonido_game_over = pygame.mixer.Sound(buffer=generar_tono(220, 0.8, 0.5, decay=False))
 except Exception:
-    # Si no hay dispositivo de audio, el juego sigue funcionando sin sonidos
     sonido_disparo = sonido_explosion = sonido_game_over = None
 
 # ---------------------------------------------------------------------------
-# Jugador (cuadrado en la parte inferior)
+# Jugador 1 (izquierda) - cuadrado azul
 # ---------------------------------------------------------------------------
 JUGADOR_TAM = 50
-jugador_x = ANCHO // 2 - JUGADOR_TAM // 2
-jugador_y = ALTO - JUGADOR_TAM - 15
-jugador_vel = 7
+jugador1_x = 100
+jugador1_y = ALTO - JUGADOR_TAM - 15
+jugador1_vel = 7
+jugador1_disparo_enfriamiento = 0
+
+# ---------------------------------------------------------------------------
+# Jugador 2 (derecha) - cuadrado verde
+# ---------------------------------------------------------------------------
+jugador2_x = ANCHO - 100 - JUGADOR_TAM
+jugador2_y = ALTO - JUGADOR_TAM - 15
+jugador2_vel = 7
+jugador2_disparo_enfriamiento = 0
 
 # ---------------------------------------------------------------------------
 # Disparos (rectĆˇngulos que suben)
@@ -83,11 +92,11 @@ jugador_vel = 7
 DISPARO_ANCHO = 6
 DISPARO_ALTO = 15
 DISPARO_VEL = -9
-disparos = []
-disparo_enfriamiento = 0  # frames entre disparos
+disparos_p1 = []  # amarillos
+disparos_p2 = []  # cian
 
 # ---------------------------------------------------------------------------
-# Enemigos (cĆ­rculos que caen desde arriba)
+# Enemigos (cĆ­rculos rojos que caen desde arriba)
 # ---------------------------------------------------------------------------
 ENEMIGO_RADIO = 20
 ENEMIGO_VEL = 4
@@ -96,9 +105,10 @@ enemigo_timer = 0
 ENEMIGO_TIEMPO_SPAWN = 45  # frames entre apariciones
 
 # ---------------------------------------------------------------------------
-# PuntuaciĆ³n
+# Puntuaciones
 # ---------------------------------------------------------------------------
-puntuacion = 0
+puntuacion1 = 0
+puntuacion2 = 0
 juego_activo = True
 
 
@@ -111,14 +121,20 @@ def spawn_enemigo():
     return {"rect": rect, "radio": ENEMIGO_RADIO}
 
 
-def disparar():
-    """Crea un nuevo disparo desde la posiciĆ³n del jugador."""
-    bx = jugador_x + JUGADOR_TAM // 2 - DISPARO_ANCHO // 2
-    by = jugador_y
+def disparar_jugador1():
+    """Crea un nuevo disparo desde la posiciĆ³n del jugador 1."""
+    bx = jugador1_x + JUGADOR_TAM // 2 - DISPARO_ANCHO // 2
+    by = jugador1_y
     rect = pygame.Rect(bx, by, DISPARO_ANCHO, DISPARO_ALTO)
-    disparos.append(rect)
-    if sonido_disparo:
-        sonido_disparo.play()
+    disparos_p1.append(rect)
+
+
+def disparar_jugador2():
+    """Crea un nuevo disparo desde la posiciĆ³n del jugador 2."""
+    bx = jugador2_x + JUGADOR_TAM // 2 - DISPARO_ANCHO // 2
+    by = jugador2_y
+    rect = pygame.Rect(bx, by, DISPARO_ANCHO, DISPARO_ALTO)
+    disparos_p2.append(rect)
 
 
 def colision_circulo_rect(cx, cy, radio, rect):
@@ -132,15 +148,21 @@ def colision_circulo_rect(cx, cy, radio, rect):
 
 def reiniciar_juego():
     """Reinicia todas las variables del juego para volver a jugar."""
-    global jugador_x, disparos, enemigos, puntuacion, juego_activo
-    global enemigo_timer, disparo_enfriamiento
-    jugador_x = ANCHO // 2 - JUGADOR_TAM // 2
-    disparos.clear()
+    global jugador1_x, jugador2_x, disparos_p1, disparos_p2, enemigos
+    global puntuacion1, puntuacion2, juego_activo
+    global enemigo_timer, jugador1_disparo_enfriamiento, jugador2_disparo_enfriamiento
+
+    jugador1_x = 100
+    jugador2_x = ANCHO - 100 - JUGADOR_TAM
+    disparos_p1.clear()
+    disparos_p2.clear()
     enemigos.clear()
-    puntuacion = 0
+    puntuacion1 = 0
+    puntuacion2 = 0
     juego_activo = True
     enemigo_timer = 0
-    disparo_enfriamiento = 0
+    jugador1_disparo_enfriamiento = 0
+    jugador2_disparo_enfriamiento = 0
 
 
 # ---------------------------------------------------------------------------
@@ -157,32 +179,53 @@ while True:
                 reiniciar_juego()
 
     if juego_activo:
-        # --- Movimiento del jugador ----------------------------------------
+        # --- Movimiento del jugador 1 (A / D) ------------------------------
         teclas = pygame.key.get_pressed()
-        if (teclas[pygame.K_LEFT] or teclas[pygame.K_a]) and jugador_x > 0:
-            jugador_x -= jugador_vel
-        if (teclas[pygame.K_RIGHT] or teclas[pygame.K_d]) and jugador_x < ANCHO - JUGADOR_TAM:
-            jugador_x += jugador_vel
+        if (teclas[pygame.K_a] or teclas[pygame.K_LEFT]) and jugador1_x > 0:
+            # SOLO jugador 1 usa A; flecha izquierda es compartida con P2 si
+            # ambos la presionan, pero aquí priorizamos A para P1.
+            if teclas[pygame.K_a]:
+                jugador1_x -= jugador1_vel
+        if (teclas[pygame.K_d] or teclas[pygame.K_RIGHT]) and jugador1_x < ANCHO - JUGADOR_TAM:
+            if teclas[pygame.K_d]:
+                jugador1_x += jugador1_vel
 
-        # --- Disparar con la barra espaciadora -----------------------------
-        if teclas[pygame.K_SPACE] and disparo_enfriamiento <= 0:
-            disparar()
-            disparo_enfriamiento = 12  # pequeĆ±a pausa entre disparos
-        if disparo_enfriamiento > 0:
-            disparo_enfriamiento -= 1
+        # --- Movimiento del jugador 2 (flechas izquierda / derecha) -------
+        if teclas[pygame.K_LEFT] and jugador2_x > 0:
+            jugador2_x -= jugador2_vel
+        if teclas[pygame.K_RIGHT] and jugador2_x < ANCHO - JUGADOR_TAM:
+            jugador2_x += jugador2_vel
 
-        # --- Actualizar disparos -------------------------------------------
-        for disparo in disparos[:]:
+        # --- Disparar ------------------------------------------------------
+        if teclas[pygame.K_SPACE] and jugador1_disparo_enfriamiento <= 0:
+            disparar_jugador1()
+            jugador1_disparo_enfriamiento = 12
+        if jugador1_disparo_enfriamiento > 0:
+            jugador1_disparo_enfriamiento -= 1
+
+        if teclas[pygame.K_k] and jugador2_disparo_enfriamiento <= 0:
+            disparar_jugador2()
+            jugador2_disparo_enfriamiento = 12
+        if jugador2_disparo_enfriamiento > 0:
+            jugador2_disparo_enfriamiento -= 1
+
+        # --- Actualizar disparos jugador 1 ---------------------------------
+        for disparo in disparos_p1[:]:
             disparo.y += DISPARO_VEL
             if disparo.bottom < 0:
-                disparos.remove(disparo)
+                disparos_p1.remove(disparo)
+
+        # --- Actualizar disparos jugador 2 ---------------------------------
+        for disparo in disparos_p2[:]:
+            disparo.y += DISPARO_VEL
+            if disparo.bottom < 0:
+                disparos_p2.remove(disparo)
 
         # --- Actualizar enemigos -------------------------------------------
         enemigo_timer += 1
         if enemigo_timer >= ENEMIGO_TIEMPO_SPAWN:
             enemigos.append(spawn_enemigo())
             enemigo_timer = 0
-            # Hacer el juego progresivamente mĆˡs difĆ­cil
             if ENEMIGO_TIEMPO_SPAWN > 20:
                 ENEMIGO_TIEMPO_SPAWN -= 1
 
@@ -197,16 +240,32 @@ while True:
                 enemigos.remove(enemigo)
                 continue
 
-            # ColisiĆ³n disparo vs enemigo
+            # ColisiĆ³n disparos jugador 1 vs enemigo
             golpeado = False
-            for disparo in disparos[:]:
+            for disparo in disparos_p1[:]:
                 if colision_circulo_rect(enemigo["rect"].centerx,
                                          enemigo["rect"].centery,
                                          enemigo["radio"], disparo):
-                    if disparo in disparos:
-                        disparos.remove(disparo)
+                    if disparo in disparos_p1:
+                        disparos_p1.remove(disparo)
                     enemigos.remove(enemigo)
-                    puntuacion += 10
+                    puntuacion1 += 10
+                    if sonido_explosion:
+                        sonido_explosion.play()
+                    golpeado = True
+                    break
+            if golpeado:
+                continue
+
+            # ColisiĆ³n disparos jugador 2 vs enemigo
+            for disparo in disparos_p2[:]:
+                if colision_circulo_rect(enemigo["rect"].centerx,
+                                         enemigo["rect"].centery,
+                                         enemigo["radio"], disparo):
+                    if disparo in disparos_p2:
+                        disparos_p2.remove(disparo)
+                    enemigos.remove(enemigo)
+                    puntuacion2 += 10
                     if sonido_explosion:
                         sonido_explosion.play()
                     golpeado = True
@@ -217,22 +276,32 @@ while True:
     # --- Dibujado ----------------------------------------------------------
     pantalla.fill(NEGRO)
 
-    # Jugador (cuadrado azul)
+    # Jugador 1 (cuadrado azul)
     pygame.draw.rect(pantalla, AZUL,
-                     (jugador_x, jugador_y, JUGADOR_TAM, JUGADOR_TAM))
+                     (jugador1_x, jugador1_y, JUGADOR_TAM, JUGADOR_TAM))
 
-    # Disparos (rectĆˇngulos amarillos)
-    for disparo in disparos:
+    # Jugador 2 (cuadrado verde)
+    pygame.draw.rect(pantalla, VERDE,
+                     (jugador2_x, jugador2_y, JUGADOR_TAM, JUGADOR_TAM))
+
+    # Disparos jugador 1 (amarillos)
+    for disparo in disparos_p1:
         pygame.draw.rect(pantalla, AMARILLO, disparo)
+
+    # Disparos jugador 2 (cian)
+    for disparo in disparos_p2:
+        pygame.draw.rect(pantalla, CIAN, disparo)
 
     # Enemigos (cĆ­rculos rojos)
     for enemigo in enemigos:
         pygame.draw.circle(pantalla, ROJO,
                            enemigo["rect"].center, enemigo["radio"])
 
-    # PuntuaciĆ³n (esquina superior izquierda)
-    texto_puntuacion = fuente.render(f"PuntuaciĆ³n: {puntuacion}", True, BLANCO)
-    pantalla.blit(texto_puntuacion, (10, 10))
+    # Puntuaciones
+    texto_p1 = fuente.render(f"Jugador 1: {puntuacion1}", True, AZUL)
+    texto_p2 = fuente.render(f"Jugador 2: {puntuacion2}", True, VERDE)
+    pantalla.blit(texto_p1, (10, 10))
+    pantalla.blit(texto_p2, (ANCHO - texto_p2.get_width() - 10, 10))
 
     if not juego_activo:
         texto_game_over = fuente_grande.render("GAME OVER", True, ROJO)

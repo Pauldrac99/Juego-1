@@ -11,11 +11,13 @@ Juego de disparos en 2D desarrollado en Python utilizando Pygame, con gráficos 
 - `context.md` - Este archivo, registro de avances y cambios
 
 ## Características implementadas
-- Jugador (cuadrado azul) en la parte inferior, movimiento horizontal (flechas / A-D)
-- Disparos (rectángulos amarillos) al presionar barra espaciadora, con breve enfriamiento
+- Multijugador para 2 jugadores en la misma pantalla
+- Jugador 1 (cuadrado azul, izquierda): movimiento con A / D, dispara con ESPACIO
+- Jugador 2 (cuadrado verde, derecha): movimiento con flechas izquierda / derecha, dispara con K
+- Disparos (rectángulos) de colores distintos por jugador (amarillo y cian)
 - Enemigos (círculos rojos) que caen desde la parte superior en posiciones X aleatorias
-- Colisión disparo-círculo (algoritmo círculo-rectángulo): enemigo y disparo desaparecen, +10 puntos
-- Puntuación mostrada en la esquina superior izquierda
+- Colisión disparo-círculo (algoritmo círculo-rectángulo): enemigo y disparo desaparecen, +10 puntos para el jugador que disparó
+- Puntuaciones individuales mostradas en las esquinas superiores (P1 izquierda, P2 derecha)
 - Game Over si un enemigo llega al fondo; se reinicia con la tecla R
 - Dificultad progresiva: los enemigos aparecen cada vez más rápido
 - Ventana 800x600, 60 FPS

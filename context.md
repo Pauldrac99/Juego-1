@@ -3,6 +3,9 @@
 ## Descripción
 Juego de disparos en 2D desarrollado en Python utilizando Pygame, con gráficos basados únicamente en figuras geométricas simples (rectángulos y círculos).
 
+## Repositorio
+- GitHub: https://github.com/Pauldrac99/Juego-1.git
+
 ## Ubicación de archivos
 - `juego_disparos.py` - Script principal del juego (único archivo, contiene todo el código)
 - `context.md` - Este archivo, registro de avances y cambios
